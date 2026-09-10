@@ -1,16 +1,27 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from fastapi_core.features.notes import router as notes_router
+from fastapi_core.features.notes.router import get_note_service
+from fastapi_core.features.notes.service import NoteService
 from fastapi_core.main import app
 
 client = TestClient(app)
 
+from collections.abc import Iterator
+
 
 @pytest.fixture(autouse=True)
-def reset_notes() -> None:
-    notes_router.notes.clear()
-    notes_router.next_id = 1
+def override_note_service() -> Iterator[None]:
+    test_service = NoteService()
+
+    def get_test_note_service() -> NoteService:
+        return test_service
+
+    app.dependency_overrides[get_note_service] = get_test_note_service
+
+    yield
+
+    app.dependency_overrides.clear()
 
 
 def test_create_note() -> None:
@@ -61,7 +72,7 @@ def test_get_missing_note_returns_404() -> None:
     assert response.status_code == 404
 
     assert response.json() == {
-        "detail": "Note not found",
+        "detail": "No note with 999",
     }
 
 
