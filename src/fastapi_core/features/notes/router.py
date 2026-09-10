@@ -1,101 +1,85 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import HTTPException, status
 
-from fastapi_core.features.notes.service import NoteService
-from fastapi_core.schemas import NoteCreate, NoteResponse, NoteUpdate
-
-router = APIRouter(
-    prefix="/notes",
-    tags=["notes"],
-)
-
-service = NoteService()
+# ERROR: you already moved Note schemas into features/notes/schema.py
+# from fastapi_core.schemas import NoteCreate, NoteResponse, NoteUpdate
+from .schema import NoteCreate, NoteResponse, NoteUpdate
 
 
-@router.get(
-    "",
-    response_model=list[NoteResponse],
-)
-service.list_notes()
+class NoteService:
+    def __init__(self) -> None:
+        self.notes: dict[int, dict[str, object]] = {}
+        self.next_id = 1
 
-@router.get(
-    "/{note_id}",
-    response_model=NoteResponse,
-)
-async def get_note(
-    note_id: int,
-) -> NoteResponse:
-    if note_id not in notes:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found",
-        )
+    # IMPROVE: no await / I/O here, so async is unnecessary
+    def list_notes(
+        self,
+        q: str | None = None,
+    ) -> list[NoteResponse]:
+        if q is None:
+            return [NoteResponse.model_validate(note) for note in self.notes.values()]
 
-    return NoteResponse.model_validate(notes[note_id])
+        return [
+            NoteResponse.model_validate(note)
+            for note in self.notes.values()
+            if q.lower() in str(note["title"]).lower()
+        ]
 
+    # IMPROVE: same reason, regular def is enough
+    def get_note(self, note_id: int) -> NoteResponse:
+        if note_id not in self.notes:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                # ERROR: your old version had "\n" at the end
+                # detail=f"No note with {note_id}\n",
+                detail=f"No note with {note_id}",
+            )
 
-@router.post(
-    "",
-    response_model=NoteResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_note(
-    payload: NoteCreate,
-) -> NoteResponse:
-    global next_id
+        return NoteResponse.model_validate(self.notes[note_id])
 
-    note: dict[str, object] = {
-        "id": next_id,
-        **payload.model_dump(),
-        "internal_version": 1,
-    }
+    def create_note(self, payload: NoteCreate) -> NoteResponse:
+        note: dict[str, object] = {
+            "id": self.next_id,
+            **payload.model_dump(),
+            "internal_version": 1,
+        }
 
-    notes[next_id] = note
-    next_id += 1
+        self.notes[self.next_id] = note
+        self.next_id += 1
 
-    return NoteResponse.model_validate(note)
+        return NoteResponse.model_validate(note)
 
+    def update_note(
+        self,
+        note_id: int,
+        payload: NoteUpdate,
+    ) -> NoteResponse:
+        if note_id not in self.notes:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                # ERROR: this was NOT an f-string:
+                # detail="No note with {note_id}"
+                detail=f"No note with {note_id}",
+            )
 
-@router.patch(
-    "/{note_id}",
-    response_model=NoteResponse,
-)
-async def update_note(
-    note_id: int,
-    payload: NoteUpdate,
-) -> NoteResponse:
-    if note_id not in notes:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found",
-        )
+        update_data = payload.model_dump(exclude_unset=True)
+        self.notes[note_id].update(update_data)
 
-    update_data = payload.model_dump(
-        exclude_unset=True,
-    )
+        current_version = self.notes[note_id]["internal_version"]
 
-    notes[note_id].update(update_data)
+        if not isinstance(current_version, int):
+            raise RuntimeError("Invalid internal version")
 
-    current_version = notes[note_id]["internal_version"]
+        self.notes[note_id]["internal_version"] = current_version + 1
 
-    if not isinstance(current_version, int):
-        raise RuntimeError("Invalid internal version")
+        return NoteResponse.model_validate(self.notes[note_id])
 
-    notes[note_id]["internal_version"] = current_version + 1
+    def delete_note(self, note_id: int) -> None:
+        if note_id not in self.notes:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                # ERROR: same bug here, missing f before the string
+                # detail="No note with {note_id}"
+                detail=f"No note with {note_id}",
+            )
 
-    return NoteResponse.model_validate(notes[note_id])
-
-
-@router.delete(
-    "/{note_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_note(
-    note_id: int,
-) -> None:
-    if note_id not in notes:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found",
-        )
-
-    del notes[note_id]
+        del self.notes[note_id]

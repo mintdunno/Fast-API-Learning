@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
 
-from fastapi_core.schemas import NoteCreate, NoteResponse, NoteUpdate
+from .schema import NoteCreate, NoteResponse, NoteUpdate
 
 
 class NoteService:
