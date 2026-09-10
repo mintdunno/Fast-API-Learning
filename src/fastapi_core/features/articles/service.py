@@ -37,7 +37,7 @@ class ArticleService:
         return ArticleResponse.model_validate(article)
 
     def update_article(
-        self, article_id: int, payload: ArticleCreate
+        self, article_id: int, payload: ArticleUpdate
     ) -> ArticleResponse:
         if article_id not in self.articles:
             raise ArticleNotFound(article_id)
