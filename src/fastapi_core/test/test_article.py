@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from fastapi_core.main import app
-from fastapi_core.routers import articles as articles_router
+from fastapi_core.features.articles import articles as articles_router
 
 client = TestClient(app)
 
