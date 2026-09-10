@@ -200,3 +200,20 @@ def test_list_notes_filters_by_title() -> None:
             "content": "Backend",
         }
     ]
+
+
+def test_patch_missing_note_returns_404() -> None:
+    response = client.patch(
+        "/notes/999",
+        json={"title": "New title"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "No note with 999"}
+
+
+def test_delete_missing_note_returns_404() -> None:
+    response = client.delete("/notes/999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "No note with 999"}
