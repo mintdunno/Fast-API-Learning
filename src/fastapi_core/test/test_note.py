@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -6,8 +8,6 @@ from fastapi_core.features.notes.service import NoteService
 from fastapi_core.main import app
 
 client = TestClient(app)
-
-from collections.abc import Iterator
 
 
 @pytest.fixture(autouse=True)

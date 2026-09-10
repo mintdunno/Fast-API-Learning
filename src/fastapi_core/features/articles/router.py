@@ -72,7 +72,6 @@ async def update_article(
 @router.delete(
     "/{article_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    response_model=ArticleResponse,
 )
 async def del_article(article_id: int, service: ArticleServiceDep) -> None:
     try:

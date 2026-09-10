@@ -1,16 +1,27 @@
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
+from fastapi_core.features.articles.router import get_article_service
+from fastapi_core.features.articles.service import ArticleService
 from fastapi_core.main import app
-from fastapi_core.features.articles import articles as articles_router
 
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def reset_articles() -> None:
-    articles_router.articles.clear()
-    articles_router.next_id = 1
+def override_article_service() -> Iterator[None]:
+    test_service = ArticleService()
+
+    def get_test_article_service() -> ArticleService:
+        return test_service
+
+    app.dependency_overrides[get_article_service] = get_test_article_service
+
+    yield
+
+    app.dependency_overrides.clear()
 
 
 def test_create_article() -> None:
