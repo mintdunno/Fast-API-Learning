@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from .schema import NoteCreate, NoteResponse, NoteUpdate
 from .service import NoteService
@@ -8,11 +8,9 @@ router = APIRouter(
     tags=["notes"],
 )
 
-service = NoteService()
 
-
-def get_note_service() -> NoteService:
-    return service
+def get_note_service(request: Request) -> NoteService:
+    return request.app.state.note_service
 
 
 @router.get(
