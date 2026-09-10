@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from .exception import NoteNotFound
 from .schema import NoteCreate, NoteResponse, NoteUpdate
 from .service import NoteService
 
@@ -21,7 +22,12 @@ def list_notes(
     q: str | None = None,
     service: NoteService = Depends(get_note_service),
 ) -> list[NoteResponse]:
-    return service.list_notes(q)
+    try:
+        return service.list_notes(q)
+    except NoteNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.get(
@@ -32,7 +38,13 @@ def get_note(
     note_id: int,
     service: NoteService = Depends(get_note_service),
 ) -> NoteResponse:
-    return service.get_note(note_id)
+    try:
+        return service.get_note(note_id)
+    except NoteNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post(
@@ -56,7 +68,13 @@ def update_note(
     payload: NoteUpdate,
     service: NoteService = Depends(get_note_service),
 ) -> NoteResponse:
-    return service.update_note(note_id, payload)
+    try:
+        return service.update_note(note_id, payload)
+    except NoteNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 
 @router.delete(
@@ -67,4 +85,10 @@ def delete_note(
     note_id: int,
     service: NoteService = Depends(get_note_service),
 ) -> None:
-    service.delete_note(note_id)
+    try:
+        service.delete_note(note_id)
+    except NoteNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
