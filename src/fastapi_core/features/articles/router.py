@@ -19,10 +19,6 @@ def get_article_service(request: Request) -> ArticleService:
 ArticleServiceDep = Annotated[ArticleService, Depends(get_article_service)]
 
 
-articles: dict[int, dict[str, object]] = {}
-next_id = 1
-
-
 @router.get("", response_model=list[ArticleResponse])
 async def list_articles(
     service: ArticleServiceDep, title: str | None = None, published: bool | None = None
