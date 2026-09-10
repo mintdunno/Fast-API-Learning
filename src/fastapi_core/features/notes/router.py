@@ -15,7 +15,7 @@ service = NoteService()
     "",
     response_model=list[NoteResponse],
 )
-async def list_notes(
+def list_notes(
     q: str | None = None,
 ) -> list[NoteResponse]:
     return service.list_notes(q)
@@ -25,7 +25,7 @@ async def list_notes(
     "/{note_id}",
     response_model=NoteResponse,
 )
-async def get_note(
+def get_note(
     note_id: int,
 ) -> NoteResponse:
     return service.get_note(note_id)
@@ -36,7 +36,7 @@ async def get_note(
     response_model=NoteResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_note(
+def create_note(
     payload: NoteCreate,
 ) -> NoteResponse:
     return service.create_note(payload)
@@ -46,7 +46,7 @@ async def create_note(
     "/{note_id}",
     response_model=NoteResponse,
 )
-async def update_note(
+def update_note(
     note_id: int,
     payload: NoteUpdate,
 ) -> NoteResponse:
@@ -57,7 +57,7 @@ async def update_note(
     "/{note_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_note(
+def delete_note(
     note_id: int,
 ) -> None:
     service.delete_note(note_id)
