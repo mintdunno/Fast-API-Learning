@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status
+from fastapi_core.features.notes.exception import NoteNotFound
 
 # ERROR: you already moved Note schemas into features/notes/schema.py
 # from fastapi_core.schemas import NoteCreate, NoteResponse, NoteUpdate
@@ -27,12 +27,7 @@ class NoteService:
     # IMPROVE: same reason, regular def is enough
     def get_note(self, note_id: int) -> NoteResponse:
         if note_id not in self.notes:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                # ERROR: your old version had "\n" at the end
-                # detail=f"No note with {note_id}\n",
-                detail=f"No note with {note_id}",
-            )
+            raise NoteNotFound(note_id)
 
         return NoteResponse.model_validate(self.notes[note_id])
 
@@ -54,12 +49,7 @@ class NoteService:
         payload: NoteUpdate,
     ) -> NoteResponse:
         if note_id not in self.notes:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                # ERROR: this was NOT an f-string:
-                # detail="No note with {note_id}"
-                detail=f"No note with {note_id}",
-            )
+            raise NoteNotFound(note_id)
 
         update_data = payload.model_dump(exclude_unset=True)
         self.notes[note_id].update(update_data)
@@ -75,11 +65,5 @@ class NoteService:
 
     def delete_note(self, note_id: int) -> None:
         if note_id not in self.notes:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                # ERROR: same bug here, missing f before the string
-                # detail="No note with {note_id}"
-                detail=f"No note with {note_id}",
-            )
-
+            raise NoteNotFound(note_id)
         del self.notes[note_id]
