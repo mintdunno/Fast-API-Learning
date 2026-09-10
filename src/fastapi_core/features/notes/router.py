@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from .exception import NoteNotFound
@@ -14,13 +16,19 @@ def get_note_service(request: Request) -> NoteService:
     return request.app.state.note_service
 
 
+NoteServiceDep = Annotated[
+    NoteService,
+    Depends(get_note_service),
+]
+
+
 @router.get(
     "",
     response_model=list[NoteResponse],
 )
 def list_notes(
+    service: NoteServiceDep,
     q: str | None = None,
-    service: NoteService = Depends(get_note_service),
 ) -> list[NoteResponse]:
     try:
         return service.list_notes(q)
@@ -36,7 +44,7 @@ def list_notes(
 )
 def get_note(
     note_id: int,
-    service: NoteService = Depends(get_note_service),
+    service: NoteServiceDep,
 ) -> NoteResponse:
     try:
         return service.get_note(note_id)
@@ -54,7 +62,7 @@ def get_note(
 )
 def create_note(
     payload: NoteCreate,
-    service: NoteService = Depends(get_note_service),
+    service: NoteServiceDep,
 ) -> NoteResponse:
     return service.create_note(payload)
 
@@ -66,7 +74,7 @@ def create_note(
 def update_note(
     note_id: int,
     payload: NoteUpdate,
-    service: NoteService = Depends(get_note_service),
+    service: NoteServiceDep,
 ) -> NoteResponse:
     try:
         return service.update_note(note_id, payload)
@@ -83,7 +91,7 @@ def update_note(
 )
 def delete_note(
     note_id: int,
-    service: NoteService = Depends(get_note_service),
+    service: NoteServiceDep,
 ) -> None:
     try:
         service.delete_note(note_id)
