@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from fastapi_core.features.notes import router as notes_router
 from fastapi_core.main import app
-from fastapi_core.routers import notes as notes_router
 
 client = TestClient(app)
 

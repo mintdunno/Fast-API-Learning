@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
 from .schema import NoteCreate, NoteResponse, NoteUpdate
 from .service import NoteService
@@ -11,12 +11,17 @@ router = APIRouter(
 service = NoteService()
 
 
+def get_note_service() -> NoteService:
+    return service
+
+
 @router.get(
     "",
     response_model=list[NoteResponse],
 )
 def list_notes(
     q: str | None = None,
+    service: NoteService = Depends(get_note_service),
 ) -> list[NoteResponse]:
     return service.list_notes(q)
 
@@ -27,6 +32,7 @@ def list_notes(
 )
 def get_note(
     note_id: int,
+    service: NoteService = Depends(get_note_service),
 ) -> NoteResponse:
     return service.get_note(note_id)
 
@@ -38,6 +44,7 @@ def get_note(
 )
 def create_note(
     payload: NoteCreate,
+    service: NoteService = Depends(get_note_service),
 ) -> NoteResponse:
     return service.create_note(payload)
 
@@ -49,6 +56,7 @@ def create_note(
 def update_note(
     note_id: int,
     payload: NoteUpdate,
+    service: NoteService = Depends(get_note_service),
 ) -> NoteResponse:
     return service.update_note(note_id, payload)
 
@@ -59,5 +67,6 @@ def update_note(
 )
 def delete_note(
     note_id: int,
+    service: NoteService = Depends(get_note_service),
 ) -> None:
     service.delete_note(note_id)
