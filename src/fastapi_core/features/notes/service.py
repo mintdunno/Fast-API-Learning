@@ -1,4 +1,9 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from fastapi_core.features.notes.exception import NoteNotFound
+from fastapi_core.features.notes.model import Note
+
+from .repository import NoteRepository
 
 # ERROR: you already moved Note schemas into features/notes/schema.py
 # from fastapi_core.schemas import NoteCreate, NoteResponse, NoteUpdate
@@ -6,40 +11,42 @@ from .schema import NoteCreate, NoteResponse, NoteUpdate
 
 
 class NoteService:
-    def __init__(self) -> None:
-        self.notes: dict[int, dict[str, object]] = {}
-        self.next_id = 1
+    def __init__(self, repository: NoteRepository, session: AsyncSession) -> None:
+        self.repository = repository
+        self.session = session
 
     # IMPROVE: no await / I/O here, so async is unnecessary
-    def list_notes(
+    async def list_notes(
         self,
         q: str | None = None,
     ) -> list[NoteResponse]:
-        if q is None:
-            return [NoteResponse.model_validate(note) for note in self.notes.values()]
+        notes = await self.repository.list_notes(q)
 
-        return [
-            NoteResponse.model_validate(note)
-            for note in self.notes.values()
-            if q.lower() in str(note["title"]).lower()
-        ]
+        return [NoteResponse.model_validate(note) for note in notes]
 
     # IMPROVE: same reason, regular def is enough
-    def get_note(self, note_id: int) -> NoteResponse:
-        if note_id not in self.notes:
+    async def get_note(self, note_id: int) -> NoteResponse:
+        note = await self.repository.get_note(note_id)
+
+        if note is None:
             raise NoteNotFound(note_id)
 
-        return NoteResponse.model_validate(self.notes[note_id])
+        return NoteResponse.model_validate(note)
 
-    def create_note(self, payload: NoteCreate) -> NoteResponse:
-        note: dict[str, object] = {
-            "id": self.next_id,
-            **payload.model_dump(),
-            "internal_version": 1,
-        }
+    async def create_note(self, payload: NoteCreate) -> NoteResponse:
+        note = Note(**payload.model_dump())
 
-        self.notes[self.next_id] = note
-        self.next_id += 1
+        try:
+            self.repository.add(note)
+
+            await self.session.flush()
+            await self.session.commit()
+
+        except Exception:
+            await self.session.rollback()
+            raise
+
+        await self.session.refresh(note)
 
         return NoteResponse.model_validate(note)
 
