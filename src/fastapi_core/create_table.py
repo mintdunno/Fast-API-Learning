@@ -1,28 +1,17 @@
-from contextlib import asynccontextmanager
+import asyncio
 
-from fastapi import FastAPI
-
-from fastapi_core.config import settings
 from fastapi_core.db import engine
-from fastapi_core.features.articles.router import router as articles_router
-from fastapi_core.features.articles.service import ArticleService
-from fastapi_core.features.notes.router import router as notes_router
+from fastapi_core.db_base import Base
+from fastapi_core.features.notes.model import Note  # noqa: F401
+from fastapi_core.features.users.model import User  # noqa: F401
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    app.state.article_service = ArticleService()
-
-    yield
+async def main() -> None:
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
 
     await engine.dispose()
 
 
-app = FastAPI(
-    title=settings.app_name,
-    debug=settings.debug,
-    lifespan=lifespan,
-)
-
-app.include_router(notes_router)
-app.include_router(articles_router)
+if __name__ == "__main__":
+    asyncio.run(main())
