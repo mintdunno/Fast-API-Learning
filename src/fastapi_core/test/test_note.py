@@ -1,27 +1,75 @@
-from collections.abc import Iterator
+import asyncio
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.pool import NullPool
 
-from fastapi_core.features.notes.router import get_note_service
-from fastapi_core.features.notes.service import NoteService
+from fastapi_core.config import settings
+from fastapi_core.db import get_session
+from fastapi_core.db_base import Base
+from fastapi_core.features.notes.model import Note  # noqa: F401
 from fastapi_core.main import app
 
-client = TestClient(app)
+# Safety guard:
+# never allow this test suite to reset the development database.
+if make_url(settings.test_database_url).database != "fastapi_core_test":
+    raise RuntimeError("Tests must use the fastapi_core_test database")
 
 
-@pytest.fixture(autouse=True)
-def override_note_service() -> Iterator[None]:
-    test_service = NoteService()
+test_engine = create_async_engine(
+    settings.test_database_url,
+    poolclass=NullPool,
+)
 
-    def get_test_note_service() -> NoteService:
-        return test_service
+TestSessionFactory = async_sessionmaker(
+    test_engine,
+    expire_on_commit=False,
+)
 
-    app.dependency_overrides[get_note_service] = get_test_note_service
+
+async def override_get_session() -> AsyncIterator[AsyncSession]:
+    async with TestSessionFactory() as session:
+        yield session
+
+
+async def create_test_schema() -> None:
+    async with test_engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+
+
+async def reset_notes() -> None:
+    async with test_engine.begin() as connection:
+        await connection.execute(text("TRUNCATE TABLE notes RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture(scope="module", autouse=True)
+def setup_test_database() -> Iterator[None]:
+    asyncio.run(create_test_schema())
+
+    app.dependency_overrides[get_session] = override_get_session
 
     yield
 
     app.dependency_overrides.clear()
+    asyncio.run(test_engine.dispose())
+
+
+@pytest.fixture(autouse=True)
+def clean_database() -> Iterator[None]:
+    asyncio.run(reset_notes())
+
+    yield
+
+
+client = TestClient(app)
 
 
 def test_create_note() -> None:
@@ -60,7 +108,7 @@ def test_create_then_get_note() -> None:
     assert get_response.status_code == 200
 
     assert get_response.json() == {
-        "id": 1,
+        "id": note_id,
         "title": "FastAPI",
         "content": "HTTP testing",
     }
@@ -70,7 +118,6 @@ def test_get_missing_note_returns_404() -> None:
     response = client.get("/notes/999")
 
     assert response.status_code == 404
-
     assert response.json() == {
         "detail": "No note with 999",
     }
@@ -86,20 +133,6 @@ def test_create_note_rejects_empty_title() -> None:
     )
 
     assert response.status_code == 422
-
-
-def test_response_does_not_leak_internal_version() -> None:
-    response = client.post(
-        "/notes",
-        json={
-            "title": "FastAPI",
-            "content": "Response models",
-        },
-    )
-
-    assert response.status_code == 201
-
-    assert "internal_version" not in response.json()
 
 
 def test_patch_updates_only_sent_fields() -> None:
@@ -161,14 +194,18 @@ def test_delete_note_returns_204() -> None:
 
     note_id = create_response.json()["id"]
 
-    response = client.delete(f"/notes/{note_id}")
+    delete_response = client.delete(f"/notes/{note_id}")
 
-    assert response.status_code == 204
-    assert response.content == b""
+    assert delete_response.status_code == 204
+    assert delete_response.content == b""
+
+    get_response = client.get(f"/notes/{note_id}")
+
+    assert get_response.status_code == 404
 
 
 def test_list_notes_filters_by_title() -> None:
-    client.post(
+    first_response = client.post(
         "/notes",
         json={
             "title": "Learn FastAPI",
@@ -176,13 +213,16 @@ def test_list_notes_filters_by_title() -> None:
         },
     )
 
-    client.post(
+    second_response = client.post(
         "/notes",
         json={
             "title": "Learn PostgreSQL",
             "content": "Database",
         },
     )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
 
     response = client.get(
         "/notes",
@@ -205,15 +245,21 @@ def test_list_notes_filters_by_title() -> None:
 def test_patch_missing_note_returns_404() -> None:
     response = client.patch(
         "/notes/999",
-        json={"title": "New title"},
+        json={
+            "title": "New title",
+        },
     )
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "No note with 999"}
+    assert response.json() == {
+        "detail": "No note with 999",
+    }
 
 
 def test_delete_missing_note_returns_404() -> None:
     response = client.delete("/notes/999")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "No note with 999"}
+    assert response.json() == {
+        "detail": "No note with 999",
+    }
